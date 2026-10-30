@@ -48,14 +48,26 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_VERIFY_SERVICE_SID = os.getenv("TWILIO_VERIFY_SERVICE_SID", "")
 
 # -----------------------------------------------------------------------------
-# PAGE CONFIGURATION & SECURITY HEADERS SIMULATION
+# PAGE CONFIGURATION & SEO / ACCESSIBILITY INJECTION
 # -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="SUKSMAVRISHTI | सूक्ष्मवृष्टि",
+    page_title="SUKSMAVRISHTI | सूक्ष्मवृष्टि - Hyperlocal Weather Advisory",
     page_icon="🌾",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Inject SEO metadata, Open Graph cards, and canonical tags for search engines & social crawlers
+seo_meta_injection = """
+<div style="display:none;" aria-hidden="true">
+    <meta name="description" content="SūkṣmaVṛṣṭi (सूक्ष्मवृष्टि) provides 1km x 1km hyperlocal weather downscaling, irrigation management, and transport safety advisories for farmers and village officials.">
+    <meta property="og:title" content="SūkṣmaVṛṣṭi | सूक्ष्मवृष्टि - Hyperlocal Weather & Agromet Advisory">
+    <meta property="og:description" content="Precision weather downscaling, irrigation management, and transit advisories for Barabanki, Uttar Pradesh.">
+    <meta property="og:image" content="https://ashutosh1210-m3ep3ragauyxrdbuhyqxsc.streamlit.app/logo.png">
+    <link rel="canonical" href="https://ashutosh1210-m3ep3ragauyxrdbuhyqxsc.streamlit.app/">
+</div>
+"""
+st.markdown(seo_meta_injection, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # CRYPTOGRAPHIC UTILITIES & RATE LIMITING
@@ -90,7 +102,6 @@ def is_rate_limited(action_key: str, max_attempts: int = 5, window_sec: int = 30
     if tracker_key not in st.session_state:
         st.session_state[tracker_key] = []
     
-    # Filter attempts within the active time window
     attempts = [t for t in st.session_state[tracker_key] if now - t < window_sec]
     st.session_state[tracker_key] = attempts
     
@@ -104,18 +115,14 @@ def is_rate_limited(action_key: str, max_attempts: int = 5, window_sec: int = 30
 # HARDENED TEXT-TO-SPEECH (XSS IMMUNE)
 # -----------------------------------------------------------------------------
 def speak_page_text(text: str, language: str = "English") -> None:
-    """
-    Speaks page instructions via browser Web Speech API with strict input sanitization.
-    """
+    """Speaks page instructions via browser Web Speech API with strict input sanitization."""
     if not text or not text.strip():
         return
 
     lang_code = "hi-IN" if language in ("हिंदी", "hi") else "en-IN"
-    # Whitelist characters to prevent script injection in DOM context
     sanitized = re.sub(r"[^a-zA-Z0-9\u0900-\u097F\s.,;:?!°/%()-]", "", text)
     sanitized = re.sub(r"\s+", " ", sanitized).strip()
 
-    # json.dumps guarantees safe string encoding without unescaped delimiters
     js_code = f"""
     <script>
     (function() {{
@@ -253,7 +260,6 @@ PREDICTIONS_CELL_CSV = "sukshmavrishti_64_cell_predictions.csv"
 PREDICTIONS_KHASRA_CSV = "latest_khasra_weather_forecast.csv"
 FEEDBACK_CSV = "weather_feedback_log.csv"
 
-# Pre-hashed PBKDF2 credentials to prevent plaintext leakage in codebase
 VILLAGE_LIST = [
     {"en": "Kalyani Basin", "hi": "कल्याणी कछार", "id": "sarpanch_kalyani", "hash": hash_password("kalyani@2026")},
     {"en": "Deokhaliya", "hi": "देवखलिया", "id": "sarpanch_deokhaliya", "hash": hash_password("deokhaliya@2026")},
@@ -323,7 +329,6 @@ def fetch_prediction_for_khasra(khasra_no: str, village_filter: str = None) -> d
         except Exception as exc:
             logger.error(f"Error reading {PREDICTIONS_CELL_CSV}: {exc}")
 
-    # Fallback default
     return {
         "cell_id": "cell_0_0",
         "village_en": "Kalyani Basin",
@@ -342,7 +347,7 @@ def fetch_prediction_for_khasra(khasra_no: str, village_filter: str = None) -> d
     }
 
 # -----------------------------------------------------------------------------
-# SESSION STATE INITIALIZATION & TAMPER RESISTANCE
+# SESSION STATE INITIALIZATION
 # -----------------------------------------------------------------------------
 DEFAULT_STATES = {
     "splash_done": False,
@@ -404,9 +409,9 @@ if not st.session_state.splash_done:
 @keyframes loadProgress {{ from {{ width: 0%; }} to {{ width: 100%; }} }}
 @keyframes fadeIn {{ from {{ opacity: 0; }} to {{ opacity: 1; }} }}
 </style>
-<div class="splash-wrapper">
+<div class="splash-wrapper" role="main" aria-label="Splash Screen">
     {img_html}
-    <div class="splash-title">SUKSMAVRISHTI</div>
+    <h1 class="splash-title">SUKSMAVRISHTI</h1>
     <div class="splash-slogan-hindi">सर्वप्रयत्नेन धान्यसंरक्षणम्</div>
     <div class="splash-loader"><div class="splash-loader-bar"></div></div>
 </div>
@@ -422,10 +427,10 @@ if not st.session_state.splash_done:
 # 2. LANGUAGE SELECTION SCREEN
 # -----------------------------------------------------------------------------
 elif not st.session_state.lang_chosen:
+    st.title("SUKSMAVRISHTI | सूक्ष्मवृष्टि")
     lang_html = """
-<div style="text-align: center; margin-top: 50px;">
-    <h1 style="color: #4ade80; font-size: 2.8rem; font-weight: 900; letter-spacing: 2px;">SUKSMAVRISHTI | सूक्ष्मवृष्टि</h1>
-    <h3 style="color: #facc15; margin-bottom: 30px;">Choose Your Preferred Language / अपनी भाषा चुनें</h3>
+<div style="text-align: center; margin-top: 20px;">
+    <h3 style="color: #facc15; margin-bottom: 30px;" tabindex="0">Choose Your Preferred Language / अपनी भाषा चुनें</h3>
 </div>
 """
     st.markdown(textwrap.dedent(lang_html), unsafe_allow_html=True)
@@ -453,10 +458,10 @@ elif st.session_state.role is None:
     farmer_lbl = "👨‍🌾 किसान लॉगिन (Farmer Login)" if is_hi else "👨‍🌾 Login as Farmer"
     sarpanch_lbl = "🛡️ सरपंच लॉगिन (Sarpanch Login)" if is_hi else "🛡️ Login as Sarpanch"
 
+    st.title("SUKSMAVRISHTI | " + title_text)
     role_html = f"""
-<div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
-    <h1 style="color: #4ade80; font-size: 2.6rem; font-weight: 900;">{html.escape(title_text)}</h1>
-    <p style="color: #cbd5e1; font-size: 1.15rem;">{html.escape(sub_text)}</p>
+<div style="text-align: center; margin-top: 20px; margin-bottom: 30px;">
+    <p style="color: #cbd5e1; font-size: 1.15rem;" tabindex="0">{html.escape(sub_text)}</p>
 </div>
 """
     st.markdown(textwrap.dedent(role_html), unsafe_allow_html=True)
@@ -532,11 +537,9 @@ elif st.session_state.role == "farmer" and st.session_state.current_page == "wel
 
     with col_w2:
         if not is_hi:
+            st.title("Welcome to Suksmavrishti")
             welcome_text = """
-<div style="color: #f8fafc;">
-    <h1 style="color: #4ade80; font-size: 2.6rem; font-weight: 800; margin-bottom: 6px;">
-        Welcome to Suksmavrishti
-    </h1>
+<div style="color: #f8fafc;" role="region" aria-label="About Suksmavrishti">
     <div style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-top: 4px; margin-bottom: 12px;">
         <span style="color: #facc15; font-size: 1.45rem; font-weight: 800;">
             "सर्वप्रयत्नेन धान्यसंरक्षणम्"
@@ -561,11 +564,9 @@ elif st.session_state.role == "farmer" and st.session_state.current_page == "wel
 """
             btn_label = "📍 View Weather Forecast"
         else:
+            st.title("सूक्ष्मवृष्टि में आपका स्वागत है")
             welcome_text = """
-<div style="color: #f8fafc;">
-    <h1 style="color: #4ade80; font-size: 2.6rem; font-weight: 800; margin-bottom: 6px;">
-        सूक्ष्मवृष्टि में आपका स्वागत है
-    </h1>
+<div style="color: #f8fafc;" role="region" aria-label="सूक्ष्मवृष्टि परिचय">
     <div style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-top: 4px; margin-bottom: 12px;">
         <span style="color: #facc15; font-size: 1.45rem; font-weight: 800;">
             "सर्वप्रयत्नेन धान्यसंरक्षणम्"
@@ -620,10 +621,10 @@ elif st.session_state.role == "farmer" and st.session_state.current_page == "far
             st.session_state.current_page = "welcome"
             st.rerun()
 
+    st.title("🔐 " + ("किसान लॉगिन एवं OTP सत्यापन" if is_hi else "Farmer Login & OTP Verification"))
     login_head_html = f"""
 <div style="margin-top: 10px; margin-bottom: 25px;">
-    <h2 style="color: #4ade80;">🔐 {'किसान लॉगिन एवं OTP सत्यापन' if is_hi else 'Farmer Login & OTP Verification'}</h2>
-    <p style="color: #cbd5e1;">{'अपना नाम, 10 अंकों का मोबाइल नंबर और गांव दर्ज कर Twilio OTP प्राप्त करें।' if is_hi else 'Enter your Name, 10-digit Mobile Number, and Village to receive a Twilio Verify SMS code.'}</p>
+    <p style="color: #cbd5e1;" tabindex="0">{'अपना नाम, 10 अंकों का मोबाइल नंबर और गांव दर्ज कर Twilio OTP प्राप्त करें।' if is_hi else 'Enter your Name, 10-digit Mobile Number, and Village to receive a Twilio Verify SMS code.'}</p>
 </div>
 """
     st.markdown(textwrap.dedent(login_head_html), unsafe_allow_html=True)
@@ -639,7 +640,6 @@ elif st.session_state.role == "farmer" and st.session_state.current_page == "far
             submit_reg = st.form_submit_button("📨 OTP प्राप्त करें (Send OTP)" if is_hi else "📨 Send OTP", type="primary")
 
         if submit_reg:
-            # Strict regex validation on input parameters (CWE-20)
             clean_name = re.sub(r"[^a-zA-Z\u0900-\u097F\s.]", "", name_input).strip()
             clean_phone = format_to_e164(phone_input)
 
@@ -682,7 +682,6 @@ elif st.session_state.role == "farmer" and st.session_state.current_page == "far
                     st.session_state.farmer_logged_in = True
                     st.session_state.otp_sent = False
                     st.session_state.current_page = "forecast"
-                    # Safely sync farmer profile to Supabase upon successful verification
                     upsert_farmer_profile(
                         phone=st.session_state.get("otp_phone", ""),
                         name=st.session_state.get("farmer_profile", {}).get("name", "Registered Farmer"),
@@ -705,7 +704,7 @@ elif st.session_state.role == "farmer" and st.session_state.current_page == "far
         speak_page_text(otp_speech, st.session_state.language)
 
 # -----------------------------------------------------------------------------
-# 6. WEATHER FORECAST & ADVISORY (XSS SANITIZED & FORMATTED)
+# 6. WEATHER FORECAST & ADVISORY
 # -----------------------------------------------------------------------------
 elif st.session_state.current_page == "forecast":
     is_hi = (st.session_state.language == "हिंदी")
@@ -727,8 +726,8 @@ elif st.session_state.current_page == "forecast":
     title_text = "🌾 खसरा वार मौसम पूर्वानुमान एवं कृषि/परिवहन परामर्श" if is_hi else "🌾 Plot-Level Weather, Irrigation & Transport Advisory"
     sub_text = "अपने खेत का खसरा नंबर दर्ज करें और तत्काल 1 किमी x 1 किमी सटीक मौसम, सिंचाई व परिवहन सलाह प्राप्त करें।" if is_hi else "Enter your Khasra Number to get instant 1 km x 1 km downscaled weather, irrigation, and transport directives."
 
-    st.markdown(f"<h2 style='color: #4ade80; margin-bottom: 2px;'>{html.escape(title_text)}</h2>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color: #cbd5e1; font-size: 1.05rem; margin-bottom: 22px;'>{html.escape(sub_text)}</p>", unsafe_allow_html=True)
+    st.title(title_text)
+    st.markdown(f"<p style='color: #cbd5e1; font-size: 1.05rem; margin-bottom: 22px;' tabindex='0'>{html.escape(sub_text)}</p>", unsafe_allow_html=True)
 
     f_col1, f_col2 = st.columns([5, 5])
     with f_col1:
@@ -750,7 +749,6 @@ elif st.session_state.current_page == "forecast":
     tell_clicked = st.button(btn_tell_label, type="primary")
 
     if tell_clicked:
-        # Whitelist Khasra input against injection (CWE-20)
         clean_input = re.sub(r"[^0-9a-zA-Z\u0900-\u097F\s/\-.,]", "", khasra_input).strip()
         if not clean_input:
             st.warning("कृपया एक मान्य खसरा नंबर दर्ज करें।" if is_hi else "Please enter a valid Khasra Number.")
@@ -808,7 +806,6 @@ elif st.session_state.current_page == "forecast":
                     "Transit conditions and road haulage routes to local mandis are optimal, clear, and safe."
                 )
 
-            # Strict HTML escaping to guarantee XSS immunity (CWE-79)
             safe_v_name = html.escape(str(v_name))
             safe_clean_input = html.escape(str(clean_input))
             safe_crop = html.escape(str(pred["crop"]))
@@ -818,20 +815,20 @@ elif st.session_state.current_page == "forecast":
             safe_cell = html.escape(str(pred["cell_id"]))
 
             advisory_card_html = f"""
-<div style="background-color: {box_bg}; border-left: 8px solid {box_border}; border: 1px solid {box_border}; padding: 22px; border-radius: 12px; margin-top: 20px; margin-bottom: 25px;">
-<div style="font-size: 1.15rem; font-weight: 800; color: {text_col}; text-transform: uppercase; margin-bottom: 8px;">
+<div style="background-color: {box_bg}; border-left: 8px solid {box_border}; border: 1px solid {box_border}; padding: 22px; border-radius: 12px; margin-top: 20px; margin-bottom: 25px;" role="region" aria-label="Weather Advisory">
+<div style="font-size: 1.15rem; font-weight: 800; color: {text_col}; text-transform: uppercase; margin-bottom: 8px;" tabindex="0">
 {badge_lbl}
 </div>
-<div style="font-size: 1.35rem; font-weight: 700; color: #f8fafc; margin-bottom: 14px;">
+<div style="font-size: 1.35rem; font-weight: 700; color: #f8fafc; margin-bottom: 14px;" tabindex="0">
 {'ग्राम/मौजा: ' if is_hi else 'Village: '} {safe_v_name} | {'खसरा/गाटा: ' if is_hi else 'Khasra: '} {safe_clean_input} | {'फसल: ' if is_hi else 'Crop: '} {safe_crop}
 </div>
 <div style="margin-top: 10px; padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border-radius: 8px; border-left: 4px solid #38bdf8;">
 <b style="color: #38bdf8; font-size: 1.05rem;">💧 {'सिंचाई एवं जल प्रबंधन परामर्श (Irrigation Advisory):' if is_hi else 'Irrigation & Drainage Directive:'}</b>
-<p style="margin: 4px 0 0 0; color: #f1f5f9; font-size: 0.98rem; line-height: 1.6;">{safe_irrigation}</p>
+<p style="margin: 4px 0 0 0; color: #f1f5f9; font-size: 0.98rem; line-height: 1.6;" tabindex="0">{safe_irrigation}</p>
 </div>
 <div style="margin-top: 12px; padding: 12px 14px; background: rgba(0, 0, 0, 0.25); border-radius: 8px; border-left: 4px solid #facc15;">
 <b style="color: #facc15; font-size: 1.05rem;">🚛 {'परिवहन एवं मंडी आवागमन निर्देश (Transport Advisory):' if is_hi else 'Transport & Mandi Haulage Directive:'}</b>
-<p style="margin: 4px 0 0 0; color: #f1f5f9; font-size: 0.98rem; line-height: 1.6;">{safe_transport}</p>
+<p style="margin: 4px 0 0 0; color: #f1f5f9; font-size: 0.98rem; line-height: 1.6;" tabindex="0">{safe_transport}</p>
 </div>
 </div>
 """
@@ -869,7 +866,7 @@ elif st.session_state.current_page == "forecast":
         speak_page_text(fc_init_speech, st.session_state.language)
 
 # -----------------------------------------------------------------------------
-# 7. SARPANCH LOGIN SCREEN (CONSTANT-TIME PBKDF2 VERIFICATION & COOLDOWN)
+# 7. SARPANCH LOGIN SCREEN
 # -----------------------------------------------------------------------------
 elif st.session_state.role == "sarpanch" and st.session_state.current_page == "sarpanch_login":
     is_hi = (st.session_state.language == "हिंदी")
@@ -880,10 +877,10 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "s
             st.session_state.role = None
             st.rerun()
 
+    st.title("🛡️ " + ("सरपंच लॉगिन" if is_hi else "Sarpanch Login"))
     sarpanch_login_head = f"""
 <div style="margin-top: 10px; margin-bottom: 25px;">
-    <h2 style="color: #4ade80;">🛡️ {'सरपंच लॉगिन' if is_hi else 'Sarpanch Login'}</h2>
-    <p style="color: #cbd5e1;">{'अपने गांव/मौजा के लिए निर्धारित User ID और पासवर्ड से लॉगिन करें।' if is_hi else 'Login using village-assigned credentials.'}</p>
+    <p style="color: #cbd5e1;" tabindex="0">{'अपने गांव/मौजा के लिए निर्धारित User ID और पासवर्ड से लॉगिन करें।' if is_hi else 'Login using village-assigned credentials.'}</p>
 </div>
 """
     st.markdown(textwrap.dedent(sarpanch_login_head), unsafe_allow_html=True)
@@ -896,7 +893,6 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "s
         s_submit = st.form_submit_button("🔓 लॉगिन करें (Login)" if is_hi else "🔓 Login", type="primary")
 
     if s_submit:
-        # Rate-limiting Sarpanch authentication attempts (CWE-307)
         if is_rate_limited("sarpanch_auth", max_attempts=5, window_sec=180):
             st.error("अत्यधिक असफल प्रयास। कृपया 3 मिनट बाद पुनः प्रयास करें।" if is_hi else "Too many failed attempts. Account locked for 3 minutes.")
         else:
@@ -904,7 +900,6 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "s
             target_v = VILLAGE_LIST[v_idx]
             clean_s_id = s_id.strip()
 
-            # Constant-time comparison on both ID and PBKDF2 hash (CWE-208)
             id_matches = hmac.compare_digest(clean_s_id, target_v["id"])
             pass_matches = verify_password_hash(s_pass.strip(), target_v["hash"])
 
@@ -932,10 +927,9 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "s
     speak_page_text(sarpanch_login_speech, st.session_state.language)
 
 # -----------------------------------------------------------------------------
-# 8. SARPANCH HOME PANEL: TWO ACTIONS (SEE FORECAST vs CONFIRM FORECAST)
+# 8. SARPANCH HOME PANEL
 # -----------------------------------------------------------------------------
 elif st.session_state.role == "sarpanch" and st.session_state.current_page == "chief_home":
-    # Verify session authenticity
     if not st.session_state.sarpanch_logged_in:
         st.session_state.current_page = "sarpanch_login"
         st.rerun()
@@ -945,7 +939,7 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
 
     top_l, top_r = st.columns([7, 3])
     with top_l:
-        st.markdown(f"<h2 style='color: #4ade80;'>🛡️ {'सरपंच नियंत्रण कक्ष' if is_hi else 'Sarpanch Dashboard'} — {s_vill}</h2>", unsafe_allow_html=True)
+        st.title(f"🛡️ {'सरपंच नियंत्रण कक्ष' if is_hi else 'Sarpanch Dashboard'} — {s_vill}")
     with top_r:
         if st.button("🚪 Logout", key="sarpanch_logout"):
             st.session_state.sarpanch_logged_in = False
@@ -953,14 +947,14 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
             st.session_state.role = None
             st.rerun()
 
-    st.markdown("<p style='color: #cbd5e1;'>कृपया वांछित कार्य का चयन करें:</p>" if is_hi else "<p style='color: #cbd5e1;'>Select an operation:</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='color: #cbd5e1;' tabindex='0'>{'कृपया वांछित कार्य का चयन करें:' if is_hi else 'Select an operation:'}</p>", unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
         c1_html = f"""
-<div style="background: rgba(30, 41, 59, 0.6); padding: 22px; border-radius: 12px; border: 1px solid #4ade80; text-align: center;">
-    <h3 style="color: #4ade80;">{'🌤️ मौसम व सिंचाई/परिवहन पूर्वानुमान देखें' if is_hi else '🌤️ See Weather & Advisory'}</h3>
-    <p style="color: #cbd5e1;">{'गांव के किसी भी खसरा संख्या हेतु तात्कालिक मौसम, सिंचाई व परिवहन परामर्श प्राप्त करें।' if is_hi else 'Check plot-level weather predictions, irrigation, and transit directives for any Khasra.'}</p>
+<div style="background: rgba(30, 41, 59, 0.6); padding: 22px; border-radius: 12px; border: 1px solid #4ade80; text-align: center;" role="region" aria-label="See Forecast Panel">
+    <h3 style="color: #4ade80;" tabindex="0">{'🌤️ मौसम व सिंचाई/परिवहन पूर्वानुमान देखें' if is_hi else '🌤️ See Weather & Advisory'}</h3>
+    <p style="color: #cbd5e1;" tabindex="0">{'गांव के किसी भी खसरा संख्या हेतु तात्कालिक मौसम, सिंचाई व परिवहन परामर्श प्राप्त करें।' if is_hi else 'Check plot-level weather predictions, irrigation, and transit directives for any Khasra.'}</p>
 </div>
 """
         st.markdown(textwrap.dedent(c1_html), unsafe_allow_html=True)
@@ -970,9 +964,9 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
 
     with c2:
         c2_html = f"""
-<div style="background: rgba(30, 41, 59, 0.6); padding: 22px; border-radius: 12px; border: 1px solid #facc15; text-align: center;">
-    <h3 style="color: #facc15;">{'📋 मौसम पूर्वानुमान सत्यापित करें' if is_hi else '📋 Confirm Weather Forecast'}</h3>
-    <p style="color: #cbd5e1;">{'बताएं कि आपके गांव/मौजा के लिए की गई मौसम भविष्यवाणी सही थी या गलत।' if is_hi else 'Report whether the downscaled weather was RIGHT or WRONG on ground.'}</p>
+<div style="background: rgba(30, 41, 59, 0.6); padding: 22px; border-radius: 12px; border: 1px solid #facc15; text-align: center;" role="region" aria-label="Confirm Forecast Panel">
+    <h3 style="color: #facc15;" tabindex="0">{'📋 मौसम पूर्वानुमान सत्यापित करें' if is_hi else '📋 Confirm Weather Forecast'}</h3>
+    <p style="color: #cbd5e1;" tabindex="0">{'बताएं कि आपके गांव/मौजा के लिए की गई मौसम भविष्यवाणी सही थी या गलत।' if is_hi else 'Report whether the downscaled weather was RIGHT or WRONG on ground.'}</p>
 </div>
 """
         st.markdown(textwrap.dedent(c2_html), unsafe_allow_html=True)
@@ -988,7 +982,7 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
     speak_page_text(chief_panel_speech, st.session_state.language)
 
 # -----------------------------------------------------------------------------
-# 9. SARPANCH CONFIRM WEATHER FORECAST (SECURED CSV EXPORT & VALIDATED UPLOAD)
+# 9. SARPANCH CONFIRM WEATHER FORECAST
 # -----------------------------------------------------------------------------
 elif st.session_state.role == "sarpanch" and st.session_state.current_page == "confirm_forecast":
     if not st.session_state.sarpanch_logged_in:
@@ -1005,10 +999,10 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
             st.session_state.current_page = "chief_home"
             st.rerun()
 
+    st.title("📷 " + ("मौसम पूर्वानुमान सत्यापन" if is_hi else "Confirm Weather Forecast Accuracy"))
     confirm_head_html = f"""
 <div style="margin-top: 10px; margin-bottom: 25px;">
-    <h2 style="color: #4ade80;">📷 {'मौसम पूर्वानुमान सत्यापन (Confirm Weather Forecast)' if is_hi else 'Confirm Weather Forecast Accuracy'}</h2>
-    <p style="color: #cbd5e1;">{'ग्राम पंचायत: ' if is_hi else 'Village: '} <b>{s_vill_hi if is_hi else s_vill_en}</b> — {'बताएं कि मॉडल द्वारा की गई भविष्यवाणी धरातल पर सही थी अथवा गलत।' if is_hi else 'Report whether ground observations matched the downscaled predictions.'}</p>
+    <p style="color: #cbd5e1;" tabindex="0">{'ग्राम पंचायत: ' if is_hi else 'Village: '} <b>{s_vill_hi if is_hi else s_vill_en}</b> — {'बताएं कि मॉडल द्वारा की गई भविष्यवाणी धरातल पर सही थी अथवा गलत।' if is_hi else 'Report whether ground observations matched the downscaled predictions.'}</p>
 </div>
 """
     st.markdown(textwrap.dedent(confirm_head_html), unsafe_allow_html=True)
@@ -1043,16 +1037,14 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
         submit_verdict = st.form_submit_button("📤 सत्यापन जमा करें (Submit Verification)" if is_hi else "📤 Submit Verification", type="primary")
 
     if submit_verdict:
-        # File upload validation (CWE-434)
         if uploaded_photo is not None:
             if uploaded_photo.size > 5 * 1024 * 1024:
                 st.error("Uploaded image exceeds maximum allowable size (5 MB)." if not is_hi else "फोटो का आकार 5 MB से कम होना आवश्यक है।")
                 st.stop()
-            # Verify magic bytes for genuine image types
             header = uploaded_photo.getvalue()[:8]
             is_valid_image = (
-                header.startswith(b"\x89PNG\r\n\x1a\n") or  # PNG
-                header.startswith(b"\xff\xd8\xff")           # JPEG
+                header.startswith(b"\x89PNG\r\n\x1a\n") or
+                header.startswith(b"\xff\xd8\xff")
             )
             if not is_valid_image:
                 st.error("Invalid file header. Please upload a genuine PNG or JPEG file." if not is_hi else "अमान्य फ़ाइल प्रकार। कृपया वैध PNG या JPEG फोटो अपलोड करें।")
@@ -1061,14 +1053,12 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
         verdict_val = "RIGHT" if ("Right" in verdict or "सही" in verdict) else "WRONG"
         stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Sanitize all CSV cell inputs against CSV/Formula Injection (CWE-1236)
         clean_khasra = sanitize_csv_cell(re.sub(r"[^0-9a-zA-Z\u0900-\u097F\s/\-.,]", "", khasra_ref))
         clean_notes = sanitize_csv_cell(re.sub(r"[^\w\u0900-\u097F\s.,;:?!-]", "", notes))
         clean_village = sanitize_csv_cell(s_vill_en)
         clean_sarpanch_id = sanitize_csv_cell(st.session_state.sarpanch_profile.get("id", "sarpanch"))
         clean_observed = sanitize_csv_cell(observed_weather)
 
-        # 1. Sync with Supabase Database
         success = insert_sarpanch_feedback(
             village=s_vill_en,
             sarpanch_id=st.session_state.sarpanch_profile.get("id", "sarpanch"),
@@ -1083,7 +1073,6 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
         else:
             st.error("Failed to sync feedback with database.")
 
-        # 2. Local fallback / backup CSV write
         file_exists = os.path.exists(FEEDBACK_CSV)
         try:
             with open(FEEDBACK_CSV, "a", newline="", encoding="utf-8") as f:
@@ -1109,17 +1098,16 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
         except Exception as exc:
             logger.error(f"Error appending to feedback CSV: {exc}")
 
-    # To display recent records from Supabase instead of local CSV:
     recent_data = fetch_feedback_for_village(s_vill_en, limit=5)
     if recent_data:
-        st.markdown("<h4 style='color: #facc15; margin-top: 25px;'>📋 हाल के सत्यापन रिकॉर्ड (Supabase Database)</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #facc15; margin-top: 25px;' tabindex='0'>📋 हाल के सत्यापन रिकॉर्ड (Supabase Database)</h4>", unsafe_allow_html=True)
         st.dataframe(pd.DataFrame(recent_data), use_container_width=True, hide_index=True)
     elif os.path.exists(FEEDBACK_CSV):
         try:
             f_df = pd.read_csv(FEEDBACK_CSV)
             vill_feed = f_df[f_df["village"].astype(str).str.strip().str.lower() == s_vill_en.lower()]
             if not vill_feed.empty:
-                st.markdown("<h4 style='color: #facc15; margin-top: 25px;'>📋 हाल के सत्यापन रिकॉर्ड (Recent Verifications)</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='color: #facc15; margin-top: 25px;' tabindex='0'>📋 हाल के सत्यापन रिकॉर्ड (Recent Verifications)</h4>", unsafe_allow_html=True)
                 st.dataframe(vill_feed.tail(5).iloc[::-1], use_container_width=True, hide_index=True)
         except Exception as exc:
             logger.warning(f"Error reading feedback records: {exc}")
