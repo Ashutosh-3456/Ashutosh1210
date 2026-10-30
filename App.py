@@ -15,6 +15,17 @@ import streamlit as st
 import streamlit.components.v1 as components
 from supabase_client import insert_sarpanch_feedback, fetch_feedback_for_village
 from supabase_client import upsert_farmer_profile
+from supabase_client import upsert_farmer_profile
+
+# Safely extract profile data with fallbacks to prevent KeyError
+farmer_name = st.session_state.get("farmer_profile", {}).get("name", "Registered Farmer")
+farmer_village = st.session_state.get("farmer_profile", {}).get("village", "Kalyani Basin")
+
+upsert_farmer_profile(
+    phone=st.session_state.get("otp_phone", ""),
+    name=farmer_name,
+    village=farmer_village
+)
 
 # -----------------------------------------------------------------------------
 # LOGGING SETUP (Prevents sensitive internal stack traces in UI)
