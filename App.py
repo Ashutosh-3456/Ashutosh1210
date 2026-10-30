@@ -15,17 +15,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 from supabase_client import insert_sarpanch_feedback, fetch_feedback_for_village
 from supabase_client import upsert_farmer_profile
-from supabase_client import upsert_farmer_profile
-
-# Safely extract profile data with fallbacks to prevent KeyError
-farmer_name = st.session_state.get("farmer_profile", {}).get("name", "Registered Farmer")
-farmer_village = st.session_state.get("farmer_profile", {}).get("village", "Kalyani Basin")
-
-upsert_farmer_profile(
-    phone=st.session_state.get("otp_phone", ""),
-    name=farmer_name,
-    village=farmer_village
-)
 
 # -----------------------------------------------------------------------------
 # LOGGING SETUP (Prevents sensitive internal stack traces in UI)
@@ -693,6 +682,12 @@ elif st.session_state.role == "farmer" and st.session_state.current_page == "far
                     st.session_state.farmer_logged_in = True
                     st.session_state.otp_sent = False
                     st.session_state.current_page = "forecast"
+                    # Safely sync farmer profile to Supabase upon successful verification
+                    upsert_farmer_profile(
+                        phone=st.session_state.get("otp_phone", ""),
+                        name=st.session_state.get("farmer_profile", {}).get("name", "Registered Farmer"),
+                        village=st.session_state.get("farmer_profile", {}).get("village", "Kalyani Basin")
+                    )
                     st.success(v_msg)
                     st.rerun()
                 else:
@@ -1073,6 +1068,22 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
         clean_sarpanch_id = sanitize_csv_cell(st.session_state.sarpanch_profile.get("id", "sarpanch"))
         clean_observed = sanitize_csv_cell(observed_weather)
 
+        # 1. Sync with Supabase Database
+        success = insert_sarpanch_feedback(
+            village=s_vill_en,
+            sarpanch_id=st.session_state.sarpanch_profile.get("id", "sarpanch"),
+            verdict=verdict_val,
+            khasra=khasra_ref.strip(),
+            observed_condition=observed_weather,
+            notes=notes.strip()
+        )
+
+        if success:
+            st.success(f"✅ Feedback successfully recorded to Supabase for {s_vill_en}!")
+        else:
+            st.error("Failed to sync feedback with database.")
+
+        # 2. Local fallback / backup CSV write
         file_exists = os.path.exists(FEEDBACK_CSV)
         try:
             with open(FEEDBACK_CSV, "a", newline="", encoding="utf-8") as f:
@@ -1094,13 +1105,16 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
                 if is_hi else
                 f"Thank you! Verification recorded for {s_vill_en} as {verdict_val}."
             )
-            st.success(f"✅ {success_msg}")
             speak_page_text(success_msg, st.session_state.language)
         except Exception as exc:
             logger.error(f"Error appending to feedback CSV: {exc}")
-            st.error("Could not write feedback. Please try again later." if not is_hi else "सत्यापन सहेजने में त्रुटि।")
 
-    if os.path.exists(FEEDBACK_CSV):
+    # To display recent records from Supabase instead of local CSV:
+    recent_data = fetch_feedback_for_village(s_vill_en, limit=5)
+    if recent_data:
+        st.markdown("<h4 style='color: #facc15; margin-top: 25px;'>📋 हाल के सत्यापन रिकॉर्ड (Supabase Database)</h4>", unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame(recent_data), use_container_width=True, hide_index=True)
+    elif os.path.exists(FEEDBACK_CSV):
         try:
             f_df = pd.read_csv(FEEDBACK_CSV)
             vill_feed = f_df[f_df["village"].astype(str).str.strip().str.lower() == s_vill_en.lower()]
@@ -1116,34 +1130,3 @@ elif st.session_state.role == "sarpanch" and st.session_state.current_page == "c
         f"Weather forecast verification page. Please report whether the forecast was Right or Wrong for your village {s_vill_en}, and submit your verification."
     )
     speak_page_text(confirm_init_speech, st.session_state.language)
-
-# Inside OTP verification success block:
-upsert_farmer_profile(
-    phone=st.session_state.otp_phone,
-    name=st.session_state.farmer_profile["name"],
-    village=st.session_state.farmer_profile["village"]
-)
-# Safely retrieve Sarpanch village details from session state
-s_vill_en = st.session_state.get("sarpanch_profile", {}).get("village", "Kalyani Basin")
-s_vill_hi = st.session_state.get("sarpanch_profile", {}).get("village_hi", "कल्याणी कछार")
-
-# Inside submit_verdict block:
-success = insert_sarpanch_feedback(
-    village=s_vill_en,
-    sarpanch_id=st.session_state.sarpanch_profile.get("id", "sarpanch"),
-    verdict=verdict_val,
-    khasra=khasra_ref.strip(),
-    observed_condition=observed_weather,
-    notes=notes.strip()
-)
-
-if success:
-    st.success(f"✅ Feedback successfully recorded to Supabase for {s_vill_en}!")
-else:
-    st.error("Failed to sync feedback with database.")
-
-# To display recent records from Supabase instead of local CSV:
-recent_data = fetch_feedback_for_village(s_vill_en, limit=5)
-if recent_data:
-    st.markdown("<h4 style='color: #facc15; margin-top: 25px;'>📋 हाल के सत्यापन रिकॉर्ड (Supabase Database)</h4>", unsafe_allow_html=True)
-    st.dataframe(pd.DataFrame(recent_data), use_container_width=True, hide_index=True)
